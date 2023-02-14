@@ -1,0 +1,14 @@
+[package]
+name = "service-candle-writer-generated-proto"
+version = "0.1.0"
+authors = ["Simpl"]
+edition = "2021"
+
+[dependencies]
+tonic = "0.8.0"
+prost = "0.11.0"
+tracing = "*"
+my-service-bus-abstractions = { tag = "0.1.1", git = "https://github.com/MyJetTools/my-service-bus-abstractions.git" }
+
+[build-dependencies]
+tonic-build = { version = "*", features = ["prost"] }

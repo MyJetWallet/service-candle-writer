@@ -1,0 +1,8 @@
+#[profile.release]
+#strip = true
+#opt-level= "s"
+#lto = true
+#codegen-units = 1
+
+[workspace]
+members = ["client", "generated_proto", "server", "service_bus"]

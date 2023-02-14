@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package service_candle_writer_messages;
+
+message BidAsk {
+  string id = 1;
+  //string date_time = 2;
+  double  bid = 3;
+  double  ask = 4;
+  uint64 unix_time_sec = 5;
+}
+
+message CandleMessage {
+  string instrument = 1;
+  uint64 unix_time_sec = 2;
+
+  CandleGroup bid = 3;
+  CandleGroup ask = 4;
+  
+}
+
+message CandleGroup {
+  CandleItem minute = 1;
+  CandleItem hour = 2;
+  CandleItem day = 3;
+  CandleItem month = 4;
+}
+
+message CandleItem {
+  double open = 4;
+  double high = 6;
+  double low = 8;
+  double close = 10;
+}

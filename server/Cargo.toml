@@ -1,0 +1,80 @@
+[package]
+name = "service-candle-writer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "service-candle-writer"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#client = "src/client"
+service-candle-writer-generated-proto = { path = "../generated_proto" } 
+service-candle-writer-client = { path = "../client" } 
+service-candle-writer-service-bus = {path = "../service_bus"}
+#Runtime
+rust-service-sdk = { tag = "0.1.20", git = "https://github.com/MyJetTools/rust-service-sdk.git" }
+tokio = { version = "*", features = ["full"] }
+futures = "0.3.26"
+tokio-util = "0.7.3"
+hyper = {version="*"}
+rand = "*"
+anyhow = "*"
+time = { version = "0.3", default-features = false, features = ["formatting"] }
+gethostname = "0.4.1"
+tonic = "0.8.0"
+prost = "0.11.0"
+uuid = {version = "*", features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]}
+async-trait = "0.1.56"
+
+#AZURE-TABLES
+azure_storage = "0.9.0"
+azure_identity = "0.9.0"
+azure_core = "0.8.0"
+azure_data_tables = "0.9.0"
+
+#TIME
+chrono = { version = "*"}
+
+#HTTP
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "cookies"] }
+
+# Serialization
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+serde_derive = "*"
+serde_yaml = "*"
+serde_repr = "*"
+num_enum = "*"
+
+#Logging and tracing
+log = "0.4"
+tracing = "0.1.19"
+tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
+tracing-bunyan-formatter = "0.3"
+tracing-log = "0.1.1"
+tracing-appender = "0.2.2"
+tracing-core = "0.1.10"
+
+#MyJetTools
+my-no-sql-data-writer = { tag = "0.1.6", git = "https://github.com/MyJetTools/my-no-sql-data-writer.git" }
+my-no-sql-tcp-reader = { tag = "0.1.8", git = "https://github.com/MyJetTools/my-no-sql-tcp-reader.git" }
+my-no-sql-server-abstractions = { tag = "0.1.1", git = "https://github.com/MyJetTools/my-no-sql-server-abstractions.git" }
+rust-extensions = { tag = "0.1.3", git = "https://github.com/MyJetTools/rust-extensions.git" }
+my-service-bus-tcp-client = { tag = "0.2.1", git = "https://github.com/MyJetTools/my-service-bus-tcp-client.git" }
+my-service-bus-shared = { tag = "0.3.2", git = "https://github.com/MyJetTools/my-service-bus-shared.git" }
+my-service-bus-abstractions = { tag = "0.1.1", git = "https://github.com/MyJetTools/my-service-bus-abstractions.git" }
+my-logger = { tag = "0.2.0", git = "https://github.com/MyJetTools/my-logger.git" }
+
+[build-dependencies]
+tonic-build = { version = "*", features = ["prost"] }

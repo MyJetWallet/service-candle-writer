@@ -1,0 +1,3 @@
+FROM rust:slim
+COPY ./target/release/service-candle-writer ./service-candle-writer 
+ENTRYPOINT ["/service-candle-writer"]
