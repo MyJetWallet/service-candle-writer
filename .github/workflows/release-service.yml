@@ -31,9 +31,9 @@ jobs:
         password: ${{ secrets.ST_DOCKER_PASSWORD }}
         path: .
         registry: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
-        repository: spot/myjetwallet.service.nft.blockchain
+        repository: spot/myjetwallet.service.candle.writer
         tag_with_ref: true
-        build_args: app_version=myjetwallet.service.nft.blockchain:${{ steps.extract_branch.outputs.branch }},app_compilation_date=${{ steps.current-time.outputs.formattedTime }}
+        build_args: app_version=myjetwallet.service.candle.writer:${{ steps.extract_branch.outputs.branch }},app_compilation_date=${{ steps.current-time.outputs.formattedTime }}
 
   update_version:
     needs: build
@@ -46,12 +46,12 @@ jobs:
         ref: uat        
         token: ${{ secrets.UAT_GIT_TOKEN }}
     - run: |
-        pattern=myjetwallet.service.nft.blockchain:.*$
-        imagename=myjetwallet.service.nft.blockchain:${GITHUB_REF#refs/tags/}
+        pattern=myjetwallet.service.candle.writer:.*$
+        imagename=myjetwallet.service.candle.writer:${GITHUB_REF#refs/tags/}
         reg=$"s/${pattern}/${imagename}/g"
         echo $reg
         find . -type f -name "deployment.*" -print0 -exec sed -i -r $reg {} \;
         git config user.name github-actions
         git config user.email github-actions@github.com
-        git commit -a -m "Update version of service myjetwallet.service.nft.blockchain"
+        git commit -a -m "Update version of service myjetwallet.service.candle.writer"
         git push
