@@ -92,6 +92,9 @@ impl InstrumentStorage {
             self.is_table_created.store(true, std::sync::atomic::Ordering::Release);
         }
 
+        tracing::info!("Restoring instrument's storage...");
+
+        let mut count = 0;
         let mut stream: Pageable<QueryEntityResponse<InstrumentStorageEntity>, _> = table_client
             .query()
             .initial_partition_key(PARTITION_KEY)
@@ -102,6 +105,7 @@ impl InstrumentStorage {
                     Ok(entity) => {
                         let mut set = self.instruments.write().await;
                         for entity in entity.entities {
+                            count += 1;
                             set.insert(entity.instrument);
                         }
                     }
@@ -110,5 +114,7 @@ impl InstrumentStorage {
                     }
                 }
             }
+
+            tracing::info!("Restored instrument's storage; count: {}", count);
     }
 }

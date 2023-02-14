@@ -7,7 +7,7 @@ use futures::StreamExt;
 
 use crate::{
     app::AppContext,
-    models::{CandleModelEntity, CandleType, CandleModel},
+    models::{CandleModel, CandleModelEntity, CandleType},
 };
 
 #[async_trait]
@@ -137,6 +137,8 @@ pub async fn restore_candles(context: &Arc<AppContext>) {
         .table_client(crate::models::CANDLE_HISTORY_TABLE_NAME);
     let instruments = context.instrument_storage.instruments.read().await;
 
+    tracing::info!("Restoring candles for {} instruments", instruments.len());
+
     for instrument in instruments.iter() {
         let instrument = instrument.clone();
         for is_bid in is_bid_ask {
@@ -149,38 +151,52 @@ pub async fn restore_candles(context: &Arc<AppContext>) {
                     current_time,
                 );
 
+                tracing::info!("Working with partition {}", partition_key);
+
                 let mut stream: Pageable<QueryEntityResponse<CandleModelEntity>, _> = table_client
                     .query()
-                    .initial_partition_key(partition_key)
+                    .initial_partition_key(&partition_key)
                     .into_stream();
 
                 'outer: loop {
                     if let Some(item) = stream.next().await {
-                    match item {
-                        Ok(entity) => {
-                            for candle_model in entity.entities {
-                                if count > limit {
-                                    break 'outer;
+                        match item {
+                            Ok(entity) => {
+                                for candle_model in entity.entities {
+                                    if count > limit {
+                                        break 'outer;
+                                    }
+                                    count += 1;
+                                    let candle = CandleModel {
+                                        open: candle_model.open,
+                                        close: candle_model.close,
+                                        high: candle_model.high,
+                                        low: candle_model.low,
+                                        datetime: candle_model.datetime_sec,
+                                    };
+
+                                    context
+                                        .cache
+                                        .init(instrument.clone(), is_bid, candle_type, candle)
+                                        .await;
+
+                                    tracing::info!(
+                                        "Working with partition {}; Processed: {}",
+                                        partition_key,
+                                        count
+                                    );
                                 }
-                                count += 1;
-                                let candle = CandleModel {
-                                    open: candle_model.open,
-                                    close: candle_model.close,
-                                    high: candle_model.high,
-                                    low: candle_model.low,
-                                    datetime: candle_model.datetime_sec,
-                                };
-                                context.cache.init(instrument.clone(), is_bid, candle_type, candle).await;
+                            }
+                            Err(err) => {
+                                tracing::error!(
+                                    "Error while restoring instrument's storage: {:?};",
+                                    err
+                                )
                             }
                         }
-                        Err(err) => {
-                            tracing::error!(
-                                "Error while restoring instrument's storage: {:?};",
-                                err
-                            )
-                        }
+                    } else {
+                        break;
                     }
-                }
                 }
             }
         }
