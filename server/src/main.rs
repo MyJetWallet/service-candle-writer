@@ -21,20 +21,16 @@ async fn main() {
     //In case to stop application we can cancel token
     let token = Arc::new(CancellationToken::new());
     let context = application.context.clone();
-    let _ = context
-        .table_service
-        .table_client(service_candle_writer::models::CANDLE_HISTORY_TABLE_NAME)
-        .create()
-        .await;
     context.instrument_storage.restore().await;
     restore_candles(&context.clone()).await;
-    context.service_bus.start().await;
+    //TODO: Uncomment this code
+    //context.service_bus.start().await;
     // setup custom code here
 
     let context = application.context.clone();
     let cancellation_token = token.clone();
     let persist_candels = tokio::spawn(async move {
-        let mut latest_timestamp = 0;
+        let mut latest_timestamp = chrono::Utc::now().timestamp() as u64;
         loop {
             tracing::info!("persist_candels cycle started!");
             if cancellation_token.is_cancelled() {

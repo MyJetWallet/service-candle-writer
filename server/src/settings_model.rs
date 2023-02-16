@@ -26,11 +26,17 @@ pub struct SettingsModelInner {
     #[serde(rename = "HourLimit")]
     pub hour_limit: usize,
 
-    #[serde(rename = "AzureStorageAccount")]
-    pub azure_storage_account: String,
+    #[serde(rename = "AzureStorageAccountAsk")]
+    pub azure_storage_account_ask: String,
 
-    #[serde(rename = "AzureStorageAccessKey")]
-    pub azure_storage_access_key: String,
+    #[serde(rename = "AzureStorageAccessKeyAsk")]
+    pub azure_storage_access_key_ask: String,
+
+    #[serde(rename = "AzureStorageAccountBid")]
+    pub azure_storage_account_bid: String,
+
+    #[serde(rename = "AzureStorageAccessKeyBid")]
+    pub azure_storage_access_key_bid: String,
 }
 
 impl rust_service_sdk::app::app_ctx::GetLogStashUrl for SettingsModel {
