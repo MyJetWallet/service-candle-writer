@@ -122,6 +122,7 @@ pub async fn restore_candles(context: &Arc<AppContext>) {
     tracing::info!("Restoring candles for {} instruments", instruments.len());
 
     for instrument in instruments.iter() {
+        let start_time = chrono::Utc::now();
         let instrument = instrument.clone();
         for is_bid in is_bid_ask {
             for (candle_type, limit) in candle_types {
@@ -149,6 +150,14 @@ pub async fn restore_candles(context: &Arc<AppContext>) {
                 tracing::info!("{}; Processed: {}", dbg_str, count);
             }
         }
+
+        let end_time = chrono::Utc::now();
+        tracing::info!(
+            "Instrument: {} restored in {} seconds",
+            instrument,
+            (end_time - start_time).num_seconds()
+        );
+
     }
 }
 
@@ -328,8 +337,8 @@ impl CandlesPersistentAzureStorage {
         expiration_date: u64,
         candle_type: CandleType,
     ) -> Vec<CandleModel> {
-        let mut result = Vec::with_capacity(2048);
         if candle_type == CandleType::Day || candle_type == CandleType::Month {
+            let mut result = Vec::with_capacity(239416);
             let table_storage = self
                 .get_azure_table_storage(instrument, bid, candle_type)
                 .await;
@@ -348,7 +357,10 @@ impl CandlesPersistentAzureStorage {
                     }
                 }
             }
+
+            result
         } else {
+            let mut result = Vec::with_capacity(239_416);
             // prepare list for getting data by partitons
             let mut partitions_key_list = vec![CandleModelEntity::generate_partition_key(
                 expiration_date,
@@ -386,6 +398,7 @@ impl CandlesPersistentAzureStorage {
                 }
             }
 
+            let table_name = get_table_name(candle_type, instrument);
             let table_storage = self
                 .get_azure_table_storage(instrument, bid, candle_type)
                 .await;
@@ -394,7 +407,12 @@ impl CandlesPersistentAzureStorage {
 
             // iterate by partitions
             for partition_key in partitions_key_list {
-                tracing::info!("Getting partition: {}", partition_key);
+                let mut count = 0;
+                tracing::info!(
+                    "Table: {}; Getting partition: {}",
+                    table_name,
+                    partition_key
+                );
                 let mut stream: Pageable<QueryEntityResponse<CandleModelEntity>, _> = table_storage
                     .query()
                     .initial_partition_key(&partition_key)
@@ -402,19 +420,25 @@ impl CandlesPersistentAzureStorage {
 
                 while let Some(entity) = stream.next().await {
                     if let Ok(entity) = entity {
-                        tracing::info!("Got entity: {:?}", entity);
                         for candle in entity.entities {
                             let candles = candle.get_candles(candle_type);
                             for candle in candles.into_iter() {
-                                tracing::info!("Got candle: {:?}", candle.1);
+                                count += 1;
                                 result.push(candle.1);
                             }
                         }
                     }
                 }
-            }
-        }
 
-        result
+                tracing::info!(
+                    "For table: {}; For partition: {}; Got {} candles",
+                    table_name,
+                    partition_key,
+                    count
+                );
+            }
+
+            result
+        }
     }
 }
