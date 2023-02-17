@@ -45,17 +45,17 @@ impl CandleModelEntity {
     }
 
     pub fn generate_partition_key(date_time: u64, candle_type: CandleType) -> String {
-        let dateTime = Utc.timestamp_millis_opt((date_time * 1000) as i64).unwrap();
+        let date_time = Utc.timestamp_millis_opt((date_time * 1000) as i64).unwrap();
         return match candle_type {
             CandleType::Minute => format!(
                 "{}{}{}",
-                dateTime.format("%Y"),
-                dateTime.format("%m"),
-                dateTime.format("%d"),
+                date_time.format("%Y"),
+                date_time.format("%m"),
+                date_time.format("%d"),
             ),
-            CandleType::Hour => format!("{}{}", dateTime.format("%Y"), dateTime.format("%m"),),
-            CandleType::Day => dateTime.format("%Y").to_string(),
-            CandleType::Month => dateTime.format("%Y").to_string(),
+            CandleType::Hour => format!("{}{}", date_time.format("%Y"), date_time.format("%m"),),
+            CandleType::Day => date_time.format("%Y").to_string(),
+            CandleType::Month => date_time.format("%Y").to_string(),
         };
     }
 
@@ -140,7 +140,7 @@ impl CandleModelEntity {
             }
             CandleType::Day => {
                 let year_d = partition_key[0..4].parse::<i32>().unwrap();
-                let month_d = row_key[4..6].parse::<u32>().unwrap();
+                let month_d = row_key[0..2].parse::<u32>().unwrap();
                 let day_d = line.parse::<u32>().unwrap();
                 let date_time: NaiveDateTime = NaiveDate::from_ymd_opt(year_d, month_d, day_d)
                     .unwrap()

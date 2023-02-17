@@ -37,8 +37,6 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
     let mut persist_bid = Vec::with_capacity(100);
     context.instrument_storage.persist().await;
 
-    //todo: remove this
-    return;
     {
         let guard = context.cache.ask_candles.read().await;
 
@@ -99,10 +97,12 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
     }
 }
 
-pub async fn restore_candles(context: &Arc<AppContext>) {
+pub async fn restore_candles(context: &Arc<AppContext>) -> u64 {
+    let mut latest_timestamp = 0;
     let minute_limit = context.settings.inner.minute_limit as i64;
     let hour_limit = context.settings.inner.hour_limit as i64;
     let current_time = chrono::Utc::now();
+    let start_time = chrono::Utc::now();
     let is_bid_ask = [false, true];
     let candle_types = [
         (
@@ -128,10 +128,10 @@ pub async fn restore_candles(context: &Arc<AppContext>) {
             for (candle_type, limit) in candle_types {
                 let mut count = 0;
                 let dbg_str = format!(
-                    "Working with instrument: {}, is:bid: {}, candle_type: {}",
+                    "instrument: {}, is:bid: {}, candle_type: {}",
                     instrument, is_bid, candle_type as i32
                 );
-                tracing::info!(dbg_str);
+                tracing::info!("Working with {}", dbg_str);
 
                 let candles = context
                     .candles_persistent_azure_storage
@@ -139,6 +139,7 @@ pub async fn restore_candles(context: &Arc<AppContext>) {
                     .await;
 
                 for candle in candles {
+                    latest_timestamp = u64::max(latest_timestamp, candle.datetime);
                     context
                         .cache
                         .init(instrument.clone(), is_bid, candle_type, candle)
@@ -157,8 +158,15 @@ pub async fn restore_candles(context: &Arc<AppContext>) {
             instrument,
             (end_time - start_time).num_seconds()
         );
-
     }
+
+    let end_time = chrono::Utc::now();
+    tracing::info!(
+        "ALL RESTORED in {} seconds",
+        (end_time - start_time).num_seconds()
+    );
+
+    return latest_timestamp;
 }
 
 pub struct CandlesPersistentAzureStorage {
@@ -189,23 +197,17 @@ impl CandlesPersistentAzureStorage {
     ) -> Arc<TableClient> {
         let table_name = get_table_name(candle_type, instrument);
 
-        tracing::info!("Table name: {}", table_name);
-
         let account = if bid {
             self.table_service_bid.clone()
         } else {
             self.table_service_ask.clone()
         };
 
-        tracing::info!("Bid: {}", bid);
-
         let cloud_tables = if bid {
             self.cloud_tables_bids.clone()
         } else {
             self.cloud_tables_asks.clone()
         };
-
-        tracing::info!("got cloud tables");
 
         {
             let table_storage = cloud_tables.read().await;
@@ -234,6 +236,7 @@ impl CandlesPersistentAzureStorage {
         let table_storage = self
             .get_azure_table_storage(instrument, bid, candle_type)
             .await;
+
         let mut entities_by_partition_rows_dict: HashMap<
             String,
             HashMap<String, CandleModelEntity>,
@@ -245,48 +248,55 @@ impl CandlesPersistentAzureStorage {
             let row_key = CandleModelEntity::generate_row_key(candle.datetime, candle_type);
 
             if !entities_by_partition_rows_dict.contains_key(&partition_key) {
-                let mut map: HashMap<String, CandleModelEntity> = HashMap::new();
-                let _ = entities_by_partition_rows_dict
-                    .get_mut(&partition_key)
-                    .insert(&mut map);
+                let map: HashMap<String, CandleModelEntity> = HashMap::new();
+                let _ = entities_by_partition_rows_dict.insert(partition_key.clone(), map);
             }
 
             // get row from Dict, otherwise get it from DB
-            let entity = if entities_by_partition_rows_dict
-                .get(&partition_key)
-                .unwrap()
-                .contains_key(&row_key)
-            {
-                entities_by_partition_rows_dict
-                    .get_mut(&partition_key)
-                    .unwrap()
-                    .get_mut(&row_key)
-                    .unwrap()
-            } else {
-                let get = table_storage
-                    .partition_key_client(&partition_key)
-                    .entity_client(&row_key)
-                    .unwrap()
-                    .get()
-                    .await;
+            let entity =
+                if let Some(partition) = entities_by_partition_rows_dict.get_mut(&partition_key) {
+                    if let Some(entity) = partition.get_mut(&row_key) {
+                        entity
+                    } else {
+                        let entity = CandleModelEntity::create(candle_type, candle.clone());
 
-                let entity = match get {
-                    Ok(ent) => ent.entity,
-                    Err(_) => CandleModelEntity::create(candle_type, candle.clone()),
+                        let entry = entities_by_partition_rows_dict
+                            .get_mut(&partition_key)
+                            .unwrap()
+                            .entry(row_key);
+
+                        let val = match entry {
+                            Entry::Occupied(o) => o.into_mut(),
+                            Entry::Vacant(v) => v.insert(entity),
+                        };
+
+                        val
+                    }
+                } else {
+                    let get = table_storage
+                        .partition_key_client(&partition_key)
+                        .entity_client(&row_key)
+                        .unwrap()
+                        .get()
+                        .await;
+
+                    let entity = match get {
+                        Ok(ent) => ent.entity,
+                        Err(_) => CandleModelEntity::create(candle_type, candle.clone()),
+                    };
+
+                    let entry = entities_by_partition_rows_dict
+                        .get_mut(&partition_key)
+                        .unwrap()
+                        .entry(row_key);
+
+                    let val = match entry {
+                        Entry::Occupied(o) => o.into_mut(),
+                        Entry::Vacant(v) => v.insert(entity),
+                    };
+
+                    val
                 };
-
-                let entry = entities_by_partition_rows_dict
-                    .get_mut(&partition_key)
-                    .unwrap()
-                    .entry(row_key);
-
-                let val = match entry {
-                    Entry::Occupied(o) => o.into_mut(),
-                    Entry::Vacant(v) => v.insert(entity),
-                };
-
-                val
-            };
 
             let mut candles_dict = entity.get_candles(candle_type);
 
@@ -307,24 +317,76 @@ impl CandlesPersistentAzureStorage {
         }
 
         for (partition_key, values) in entities_by_partition_rows_dict.into_iter() {
-            //let values =
-            let mut transaction_builder = table_storage
-                .partition_key_client(&partition_key)
-                .transaction();
+            let values: Vec<(String, CandleModelEntity)> = values.into_iter().collect();
+            let mut i = 0;
+            let mut j = if (values.len() - i) > 90 {
+                90
+            } else {
+                values.len()
+            };
+            'inner: loop {
+                /* let mut transaction_builder = table_storage
+                    .partition_key_client(&partition_key)
+                    .transaction();*/
 
-            for (row_key, entity) in values.into_iter() {
-                transaction_builder = transaction_builder
-                    .insert_or_replace(row_key, entity, azure_data_tables::IfMatchCondition::Any)
-                    .unwrap();
-            }
+                for (row_key, entity) in &values[i..j] {
+                    /* transaction_builder = transaction_builder
+                        .insert_or_replace(row_key, &entity, azure_data_tables::IfMatchCondition::Any)
+                        .unwrap(); */
 
-            let res = transaction_builder.into_future().await;
+                    let entity_client = table_storage
+                        .partition_key_client(&partition_key)
+                        .entity_client(row_key)
+                        .unwrap();
 
-            match res {
-                Ok(_) => {}
-                Err(err) => {
-                    tracing::error!("Error while saving candles to Azure; Err: {:?}", err);
+                    let res = entity_client.insert_or_replace(entity).unwrap().await;
+
+                    match res {
+                        Ok(_response) => {
+                           /*  tracing::trace!(
+                                "SAVED! {} {} {}; headers: {:?}  ", //RESPONSES: {:?}",
+                                instrument,
+                                bid,
+                                candle_type as i32,
+                                response.common_storage_response_headers,
+                                //response.operation_responses
+                            ); */
+                        }
+                        Err(err) => {
+                            tracing::error!("Error while saving candles to Azure; Err: {:?}", err);
+                        }
+                    }
                 }
+                /* 
+                let res = transaction_builder.into_future().await;
+
+                match res {
+                    Ok(response) => {
+                        tracing::info!(
+                            "SAVED! {} {} {}; headers: {:?}; RESPONSES: {:?}",
+                            instrument,
+                            bid,
+                            candle_type as i32,
+                            response.common_storage_response_headers,
+                            response.operation_responses
+                        );
+                    }
+                    Err(err) => {
+                        tracing::error!("Error while saving candles to Azure; Err: {:?}", err);
+                    }
+                } */
+
+                i = j;
+
+                if i >= values.len() {
+                    break 'inner;
+                }
+
+                j = if (values.len() - i) > 90 {
+                    i + 90
+                } else {
+                    values.len()
+                };
             }
         }
         // bulk update is allowed only whithin the same partition
@@ -338,7 +400,7 @@ impl CandlesPersistentAzureStorage {
         candle_type: CandleType,
     ) -> Vec<CandleModel> {
         if candle_type == CandleType::Day || candle_type == CandleType::Month {
-            let mut result = Vec::with_capacity(239416);
+            let mut result = Vec::with_capacity(1024);
             let table_storage = self
                 .get_azure_table_storage(instrument, bid, candle_type)
                 .await;

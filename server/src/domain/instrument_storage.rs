@@ -84,6 +84,7 @@ impl InstrumentStorage {
         }
     }
 
+    //returns latest timestamp
     pub async fn restore(&self) {
         let table_client = self.persist_table_client.clone();
         
