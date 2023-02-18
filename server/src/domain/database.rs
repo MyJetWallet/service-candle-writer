@@ -100,7 +100,6 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
 
 pub async fn restore_candles(context: &Arc<AppContext>) -> u64 {
     let mut latest_timestamp = 0;
-    return latest_timestamp;
     let minute_limit = context.settings.inner.minute_limit as i64;
     let hour_limit = context.settings.inner.hour_limit as i64;
     let current_time = chrono::Utc::now();
