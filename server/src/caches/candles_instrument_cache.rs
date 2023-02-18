@@ -44,7 +44,7 @@ impl CandlesInstrumentsCache {
             false => self.ask_candles.write().await,
         };
 
-        let mut result = Vec::with_capacity(prices.len());
+        let mut result = Vec::with_capacity(prices.len() * 4);
         for bid_ask in prices.iter() {
             let target_instruments_cache = write_lock.get_mut(&bid_ask.instrument);
             let target_rate = match is_bid {

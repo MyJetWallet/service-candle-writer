@@ -46,8 +46,9 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
                     candle_cache.get_by_date_range(candle_type, latest_timestamp, current_time);
 
                 tracing::info!(
-                    "Persist candles for instrument {}, amount: {}",
+                    "Persist ask candles for instrument {}; candle_type: {}, amount: {}",
                     instrument,
+                    candle_type as i32,
                     to_persist_ask.len()
                 );
 
@@ -65,8 +66,9 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
                     candle_cache.get_by_date_range(candle_type, latest_timestamp, current_time);
 
                 tracing::info!(
-                    "Persist candles for instrument {}, amount: {}",
+                    "Persist bid candles for instrument {}, candle_type: {}, amount: {}",
                     instrument,
+                    candle_type as i32,
                     to_persist_bid.len()
                 );
 
@@ -74,7 +76,6 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
             }
         }
     }
-
     for ask in persist_ask {
         let instrument = ask.0;
         let candle_type = ask.1;
@@ -99,6 +100,7 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
 
 pub async fn restore_candles(context: &Arc<AppContext>) -> u64 {
     let mut latest_timestamp = 0;
+    return latest_timestamp;
     let minute_limit = context.settings.inner.minute_limit as i64;
     let hour_limit = context.settings.inner.hour_limit as i64;
     let current_time = chrono::Utc::now();
@@ -233,6 +235,13 @@ impl CandlesPersistentAzureStorage {
         candle_type: CandleType,
         candles: Vec<CandleModel>,
     ) {
+        /* tracing::info!(
+            "Saving BULK {} {} {} candles {}",
+            instrument,
+            bid,
+            candle_type as i32,
+            candles.len()
+        ); */
         let table_storage = self
             .get_azure_table_storage(instrument, bid, candle_type)
             .await;
@@ -326,13 +335,13 @@ impl CandlesPersistentAzureStorage {
             };
             'inner: loop {
                 /* let mut transaction_builder = table_storage
-                    .partition_key_client(&partition_key)
-                    .transaction();*/
+                .partition_key_client(&partition_key)
+                .transaction();*/
 
                 for (row_key, entity) in &values[i..j] {
                     /* transaction_builder = transaction_builder
-                        .insert_or_replace(row_key, &entity, azure_data_tables::IfMatchCondition::Any)
-                        .unwrap(); */
+                    .insert_or_replace(row_key, &entity, azure_data_tables::IfMatchCondition::Any)
+                    .unwrap(); */
 
                     let entity_client = table_storage
                         .partition_key_client(&partition_key)
@@ -342,22 +351,22 @@ impl CandlesPersistentAzureStorage {
                     let res = entity_client.insert_or_replace(entity).unwrap().await;
 
                     match res {
-                        Ok(_response) => {
-                           /*  tracing::trace!(
+                        Ok(response) => {
+                            tracing::trace!(
                                 "SAVED! {} {} {}; headers: {:?}  ", //RESPONSES: {:?}",
                                 instrument,
                                 bid,
                                 candle_type as i32,
                                 response.common_storage_response_headers,
                                 //response.operation_responses
-                            ); */
+                            );
                         }
                         Err(err) => {
                             tracing::error!("Error while saving candles to Azure; Err: {:?}", err);
                         }
                     }
                 }
-                /* 
+                /*
                 let res = transaction_builder.into_future().await;
 
                 match res {
