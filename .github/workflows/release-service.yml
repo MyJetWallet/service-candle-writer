@@ -1,57 +1,25 @@
 name: Release Service
-
 on:
+  workflow_dispatch:
   push:
-    tags: "1.*"
+    branches:
+      - master
+    tags:
+      - 1.*
 
 jobs:
-  build:
-
-    runs-on: self-hosted
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Get current time
-      uses: MyJetTools/get-current-time@v2
-      id: current-time
-      with:
-        format: YYYY-MM-DD HH:mm:ss
-        utcOffset: "+00:00"
-
-    - name: Extract branch name
-      shell: bash
-      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/tags/})"
-      id: extract_branch
-
-    - name: Publish image ST
-      uses: docker/build-push-action@v1
-      with:
-        username: ${{ secrets.ST_DOCKER_USER }}
-        password: ${{ secrets.ST_DOCKER_PASSWORD }}
-        path: .
-        registry: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
-        repository: spot/myjetwallet.service.candle.writer
-        tag_with_ref: true
-        build_args: app_version=myjetwallet.service.candle.writer:${{ steps.extract_branch.outputs.branch }},app_compilation_date=${{ steps.current-time.outputs.formattedTime }}
-
-  update_version:
-    needs: build
-    runs-on: self-hosted
-    steps:
-    - name: get uat kube yamls
-      uses: actions/checkout@v2
-      with:
-        repository: MyJetWallet/kubernates-infrastructure
-        ref: uat        
-        token: ${{ secrets.UAT_GIT_TOKEN }}
-    - run: |
-        pattern=myjetwallet.service.candle.writer:.*$
-        imagename=myjetwallet.service.candle.writer:${GITHUB_REF#refs/tags/}
-        reg=$"s/${pattern}/${imagename}/g"
-        echo $reg
-        find . -type f -name "deployment.*" -print0 -exec sed -i -r $reg {} \;
-        git config user.name github-actions
-        git config user.email github-actions@github.com
-        git commit -a -m "Update version of service myjetwallet.service.candle.writer"
-        git push
+  uat:
+    uses: MyJetWallet/DevOps/.github/workflows/rust_build.yml@master
+    if: startsWith(github.event.ref, 'refs/tags/1')
+    with:
+      repository_name: ${{ github.event.repository.name }}
+      repository_type: ${{ github.event.repository.private }}
+      release_version: ${GITHUB_REF#refs/tags/}
+    secrets: 
+      ST_DOCKER_USER: ${{ secrets.ST_DOCKER_USER }}
+      ST_DOCKER_PASSWORD: ${{ secrets.ST_DOCKER_PASSWORD }}
+      AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      UAT_GIT_TOKEN: ${{ secrets.UAT_GIT_TOKEN }}
+  test:
+    uses: MyJetWallet/DevOps/.github/workflows/rust_build_test.yml@master
+    if: github.ref == 'refs/heads/master'
