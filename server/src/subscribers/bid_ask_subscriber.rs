@@ -46,63 +46,64 @@ impl SubscriberCallback<BidAsk> for BidAskSubscriber {
                 self.instrument_storage.add(instrument.clone()).await;
             }
             
-            let (bid, ask) = self.cache.update(vec![message]).await;
+            let (bid, ask) = self.cache
+            .update_once(message).await;
 
             let publisher = self.service_bus.get_publisher::<CandleMessage>(true).await;
             
             let to_transfer = CandleMessage {
                 instrument: instrument.clone(),
-                unix_time_sec: bid[0].1.datetime,
+                unix_time_sec: bid.0.1.datetime,
                 ask: Some(CandleGroup {
                     minute: Some (CandleItem {
-                        open: ask[0].1.open,
-                        close: ask[0].1.close,
-                        high: ask[0].1.high,
-                        low: ask[0].1.low,
+                        open: ask.0.1.open,
+                        close: ask.0.1.close,
+                        high: ask.0.1.high,
+                        low: ask.0.1.low,
                     }),
                     hour: Some (CandleItem {
-                        open: ask[1].1.open,
-                        close: ask[1].1.close,
-                        high: ask[1].1.high,
-                        low: ask[1].1.low,
+                        open: ask.1.1.open,
+                        close: ask.1.1.close,
+                        high: ask.1.1.high,
+                        low: ask.1.1.low,
                     }),
                     day: Some (CandleItem {
-                        open: ask[2].1.open,
-                        close: ask[2].1.close,
-                        high: ask[2].1.high,
-                        low: ask[2].1.low,
+                        open: ask.2.1.open,
+                        close: ask.2.1.close,
+                        high: ask.2.1.high,
+                        low: ask.2.1.low,
                     }),
                     month: Some (CandleItem {
-                        open: ask[3].1.open,
-                        close: ask[3].1.close,
-                        high: ask[3].1.high,
-                        low: ask[3].1.low,
+                        open: ask.3.1.open,
+                        close: ask.3.1.close,
+                        high: ask.3.1.high,
+                        low: ask.3.1.low,
                     }),
                 }),
                 bid: Some(CandleGroup {
                     minute: Some (CandleItem {
-                        open: bid[0].1.open,
-                        close: bid[0].1.close,
-                        high: bid[0].1.high,
-                        low: bid[0].1.low,
+                        open: bid.0.1.open,
+                        close: bid.0.1.close,
+                        high: bid.0.1.high,
+                        low: bid.0.1.low,
                     }),
                     hour: Some (CandleItem {
-                        open: bid[1].1.open,
-                        close: bid[1].1.close,
-                        high: bid[1].1.high,
-                        low: bid[1].1.low,
+                        open: bid.1.1.open,
+                        close: bid.1.1.close,
+                        high: bid.1.1.high,
+                        low: bid.1.1.low,
                     }),
                     day: Some (CandleItem {
-                        open: bid[2].1.open,
-                        close: bid[2].1.close,
-                        high: bid[2].1.high,
-                        low: bid[2].1.low,
+                        open: bid.2.1.open,
+                        close: bid.2.1.close,
+                        high: bid.2.1.high,
+                        low: bid.2.1.low,
                     }),
                     month: Some (CandleItem {
-                        open: bid[3].1.open,
-                        close: bid[3].1.close,
-                        high: bid[3].1.high,
-                        low: bid[3].1.low,
+                        open: bid.3.1.open,
+                        close: bid.3.1.close,
+                        high: bid.3.1.high,
+                        low: bid.3.1.low,
                     }),
                 }),
             };

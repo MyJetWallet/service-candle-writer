@@ -45,13 +45,16 @@ impl CandleTypeCache {
         }
     }
 
-    pub fn handle_new_rate(&mut self, rate: f64, date: u64) -> Vec<(CandleType, CandleModel)> {
-        vec![
+    pub fn handle_new_rate(&mut self, rate: f64, date: u64) -> ((CandleType, CandleModel), 
+                                                                (CandleType, CandleModel), 
+                                                                (CandleType, CandleModel), 
+                                                                (CandleType, CandleModel)) {
+        (
             self.candles_by_minute.handle_new_rate(date, rate),
             self.candles_by_hour.handle_new_rate(date, rate),
             self.candles_by_day.handle_new_rate(date, rate),
             self.candles_by_month.handle_new_rate(date, rate),
-        ]
+        )
     }
 
     pub fn clear(&mut self) {

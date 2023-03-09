@@ -1,0 +1,15 @@
+FROM rust
+
+RUN apt-get update && apt-get install -y curl valgrind build-essential clang
+RUN apt-get install -y protobuf-compiler
+ENV RUST_VERSION=stable
+ENV ConsoleOutputLogLevel=Information
+ENV ENVIRONMENT=uat
+
+# Install Rust
+ENV SETTINGS_URL=YOURSETTINGSURL
+
+RUN apt-get install -y less
+
+WORKDIR /app
+COPY ./ /app

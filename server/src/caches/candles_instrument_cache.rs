@@ -34,6 +34,29 @@ impl CandlesInstrumentsCache {
         )
     }
 
+    pub async fn update_once(
+        &self,
+        price: CandlesBidAsk,
+    ) -> (
+        (
+            (CandleType, CandleModel),
+            (CandleType, CandleModel),
+            (CandleType, CandleModel),
+            (CandleType, CandleModel),
+        ),
+        (
+            (CandleType, CandleModel),
+            (CandleType, CandleModel),
+            (CandleType, CandleModel),
+            (CandleType, CandleModel),
+        ),
+    ) {
+        (
+            self.update_bid_or_ask_once(true, &price).await,
+            self.update_bid_or_ask_once(false, &price).await,
+        )
+    }
+
     async fn update_bid_or_ask(
         &self,
         is_bid: bool,
@@ -68,10 +91,53 @@ impl CandlesInstrumentsCache {
                 }
             }
 
-            result.extend(candle_updates);
+            result.push(candle_updates.0);
+            result.push(candle_updates.1);
+            result.push(candle_updates.2);
+            result.push(candle_updates.3);
         }
 
         result
+    }
+
+    async fn update_bid_or_ask_once(
+        &self,
+        is_bid: bool,
+        bid_ask: &CandlesBidAsk,
+    ) -> (
+        (CandleType, CandleModel),
+        (CandleType, CandleModel),
+        (CandleType, CandleModel),
+        (CandleType, CandleModel),
+    ) {
+        let mut write_lock = match is_bid {
+            true => self.bid_candles.write().await,
+            false => self.ask_candles.write().await,
+        };
+
+        let target_instruments_cache = write_lock.get_mut(&bid_ask.instrument);
+        let target_rate = match is_bid {
+            true => bid_ask.bid,
+            false => bid_ask.ask,
+        };
+
+        let candle_updates;
+        match target_instruments_cache {
+            Some(cache) => {
+                candle_updates = cache.handle_new_rate(target_rate, bid_ask.date);
+            }
+            None => {
+                let mut cache = CandleTypeCache::new(
+                    bid_ask.instrument.clone(),
+                    self.minute_capacity,
+                    self.hour_capacity,
+                );
+                candle_updates = cache.handle_new_rate(target_rate, bid_ask.date);
+                write_lock.insert(bid_ask.instrument.clone(), cache);
+            }
+        }
+
+        candle_updates
     }
 
     pub async fn init(
@@ -93,8 +159,11 @@ impl CandlesInstrumentsCache {
                 cache.init(candle, candle_type);
             }
             None => {
-                let mut cache = CandleTypeCache::new(instument_id.clone(),
-                 self.minute_capacity, self.hour_capacity);
+                let mut cache = CandleTypeCache::new(
+                    instument_id.clone(),
+                    self.minute_capacity,
+                    self.hour_capacity,
+                );
                 cache.init(candle, candle_type);
                 target_cache.insert(instument_id, cache);
             }
