@@ -29,8 +29,7 @@ async fn main() {
         context.instrument_storage.restore().await;
 
         //RESTORE CANDLES CACHE
-        //let mut latest_timestamp = restore_candles(&context.clone()).await;
-        let mut latest_timestamp = 0;
+        let mut latest_timestamp = restore_candles(&context.clone()).await;
         //START SERVICE BUS
         context.service_bus.start().await;
         loop {
@@ -49,7 +48,7 @@ async fn main() {
         }
     });
 
-/*     let context = application.context.clone();
+/*  let context = application.context.clone();
     let cancellation_token = token.clone();
     let check_size = tokio::spawn(async move {
         let mut candles_counter_min_last = 0;
