@@ -33,15 +33,23 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
         CandleType::Day,
         CandleType::Month,
     ];
-    let mut persist_ask = Vec::with_capacity(100);
-    let mut persist_bid = Vec::with_capacity(100);
+
     context.instrument_storage.persist().await;
+
+    let instruments_len;
+    {
+        instruments_len = context.instrument_storage.instruments.read().await.len();
+    }
+    let storage_len = candle_types.len() * instruments_len;
+    let mut persist_ask = Vec::with_capacity(storage_len);
+    let mut persist_bid = Vec::with_capacity(storage_len);
 
     {
         let guard = context.cache.ask_candles.read().await;
 
         for (instrument, candle_cache) in guard.iter() {
             for candle_type in candle_types {
+                let latest_timestamp = candle_type.format_date_by_type(latest_timestamp);
                 let to_persist_ask =
                     candle_cache.get_by_date_range(candle_type, latest_timestamp, current_time);
 
@@ -62,6 +70,7 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
 
         for (instrument, candle_cache) in guard.iter() {
             for candle_type in candle_types {
+                let latest_timestamp = candle_type.format_date_by_type(latest_timestamp);
                 let to_persist_bid =
                     candle_cache.get_by_date_range(candle_type, latest_timestamp, current_time);
 
@@ -76,6 +85,7 @@ pub async fn persist_candles(context: &Arc<AppContext>, latest_timestamp: u64, c
             }
         }
     }
+    
     for ask in persist_ask {
         let instrument = ask.0;
         let candle_type = ask.1;
